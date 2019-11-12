@@ -14,7 +14,7 @@ const nexmo = new Nexmo({
 });
 
 let userSchema = require('./model/user');
-let otp_schema=require('./model/otp');
+let otp_schema = require('./model/otp');
 const error_login = "Thông tin không hợp lệ";
 let userModel = userSchema.userModel;
 let invalidModel = userModel.invalidModel;
@@ -92,7 +92,7 @@ app.post('/auth', function (req, res) {
                         nexmo.message.sendSms('Nexmo', receive_number, otp_code, { type: 'unicode' }, (err, data) => {
                             if (err) {
                                 console.log(err);
-                                res.render('error.ejs');
+                                res.render('index.ejs', { message: 'Nexmo server error!', invalid_count: sess.invalid_count });
                             }
                             else {
                                 console.dir(data);
@@ -169,12 +169,12 @@ app.route('/otp_auth')
                                 console.log('OTP success');
                                 res.render('dashboard.ejs');
                             }
-                        
-                        else {
-                            res.render('otp.ejs', { message: 'Wrong OTP code', invalid_count: sess.invalid_count });
+
+                            else {
+                                res.render('otp.ejs', { message: 'Wrong OTP code', invalid_count: sess.invalid_count });
+                            }
                         }
                     }
-                }
                 })
             }
             catch (err) {

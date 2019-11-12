@@ -10,15 +10,18 @@ var OtpSchema = mongoose.Schema({
     date_created: {
         type: Date,
         required: true,
-        default: Date.now(),
+        default: Date.now,
     },
     expireAt: {
         type: Date,
-        default: Date.now
+        default: Date.now,
+        index: { expires: 10 }
     },
 })
 OtpSchema.plugin(uniqueValidator);
-OtpSchema.index({expireAt:1},{expireAfterSeconds:10});
+//OtpSchema.index({expireAt:1},{expireAfterSeconds:10});// Hết hạn sau 10 giây
+
+
 var otpModel = mongoose.model('otp_list', OtpSchema);
 
 exports.otpModel = otpModel;

@@ -16,7 +16,7 @@ var invalidSchema=mongoose.Schema({
     },
     time:{
         type:Date,
-        default:Date.now(),
+        default:Date.now,
         required:true
     }
 });
@@ -46,7 +46,11 @@ var UserSchema = mongoose.Schema({
         max: 999,
         min: 6
     },
-    
+    phone:{
+        type:Number,
+        max:10,
+        required:true
+    },
     status:{
         type:Number,
         default:0,

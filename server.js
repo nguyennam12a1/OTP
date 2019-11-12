@@ -7,31 +7,28 @@ const bcrypt = require('bcrypt');
 const Nexmo = require('nexmo');
 const otplib = require('otplib');
 const otp_secret = 'khanh9517';
-const invalid_count = 0;
 const nexmo = new Nexmo({
     apiKey: '8f69d5f9',
-    apiSecret: 'hPdA2OlKBHIFuhfI',
+    apiSecret: 'hPdA2OlKBHIFuhfI', // Hiện tài khoản đã hết hạn sử dụng
 });
 
 let userSchema = require('./model/user');
 let otp_schema = require('./model/otp');
-const error_login = "Thông tin không hợp lệ";
 let userModel = userSchema.userModel;
 let invalidModel = userModel.invalidModel;
 let otpModel = otp_schema.otpModel;
 
-
 //Bcrypt setup
 const saltRounds = 10;
 app.use(session({
-    secret: 'lmao',
+    secret: 'nguyennam12a1',
     resave: false,
     saveUninitialized: false
 }))
-
+//Express setup
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
+//View engine setup
 app.set('view engine', 'ejs');
 
 //Connect MongoDB
@@ -50,7 +47,6 @@ app.get('/', function (req, res) {
 
 //Authentication Login page
 app.get('/auth', function (req, res) {
-
     res.render('lmao.ejs');
 });
 
@@ -157,33 +153,23 @@ app.route('/otp_auth')
 
                     } else { // OTP found
                         console.log("OTP is found");
-                        let time_temp = Date.now();
-                        
-                        if (time_temp - data.date_created > 60000) {//Check time expiration
-                            otpModel.findOneAndDelete({otp_code:token_otp},function(error,doc){
-                                if(err) console.log(`Delete otp failed with error:${err}`);
-                                else console.log('Delete expired OTP success!');
+                        // Check if otp code is valid
+                        const isValid = otplib.authenticator.check(token_otp, otp_secret);
+                        console.log(`Result compare:${isValid}`);
+                        if (isValid) { // IF OTP CORRECT
+                            otpModel.findOneAndDelete({ otp_code: token_otp }, function (error, doc) {
+                                if (err) console.log(`Delete otp failed with error:${err}`);
+                                else console.log('Delete OTP success!');
                             })
-                            res.render('otp.ejs', { message: 'OTP Expired', invalid_count: sess.invalid_count });
+                            console.log('OTP success');
+                            req.session.isValid = isValid;
+                            res.render('dashboard.ejs');
                         }
-                        else {// Check if otp code is valid
-                            const isValid = otplib.authenticator.check(token_otp, otp_secret);
-                            console.log(`Result compare:${isValid}`);
-                            if (isValid) { // IF OTP CORRECT
-                                otpModel.findOneAndDelete({otp_code:token_otp},function(error,doc){
-                                    if(err) console.log(`Delete otp failed with error:${err}`);
-                                    else console.log('Delete OTP success!');
-                                })
-                                console.log('OTP success');
-                                req.session.isValid=isValid;
-                                res.render('dashboard.ejs');
-                            }
-
-                            else {
-                                res.render('otp.ejs', { message: 'Wrong OTP code', invalid_count: sess.invalid_count });
-                            }
+                        else { // OTP Wrong
+                            res.render('otp.ejs', { message: 'Wrong OTP code', invalid_count: sess.invalid_count });
                         }
                     }
+
                 })
             }
             catch (err) {
@@ -214,7 +200,7 @@ app.route('/signup')
         res.render('signup', { message: undefined });
     })
     .post(function (req, res) {
-        let { email, password, name, age,phone } = req.body;
+        let { email, password, name, age, phone } = req.body;
         console.log(`Email:${email}\nPassword:${password}\nName:${name}\nAge:${age}`);
         //Generate bcrypt password
         bcrypt.hash(password, saltRounds, function (err, hash) {
@@ -223,7 +209,7 @@ app.route('/signup')
                 res.render('signup.ejs', { message: err });
             }
             else { //Save user into database
-                let new_user = new userModel({ email: email, password: hash, name: name, age: age,phone:phone });
+                let new_user = new userModel({ email: email, password: hash, name: name, age: age, phone: phone });
                 new_user.save((err) => {
                     if (err) {
                         console.log(err);

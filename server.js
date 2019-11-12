@@ -42,6 +42,7 @@ mongoose.connection.once('open', function (err) {
 //Routing
 app.get('/', function (req, res) {
     res.render('index.ejs', { message: undefined });
+    res.cookie.
 });
 
 
@@ -166,7 +167,7 @@ app.route('/otp_auth')
                             res.render('dashboard.ejs');
                         }
                         else { // OTP Wrong
-                            res.render('otp.ejs', { message: 'Wrong OTP code', invalid_count: sess.invalid_count });
+                            res.render('otp.ejs', { message: 'OTP has expired', invalid_count: sess.invalid_count });
                         }
                     }
 

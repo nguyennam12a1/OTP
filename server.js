@@ -64,7 +64,7 @@ app.post('/auth', function (req, res) {
         }
         else if (data) {
             if (data.status == 1) {
-                res.render('index.ejs', { message: 'This account has been locked due to OTP verification failed!' });
+                res.render('index.ejs', { message: 'This account has been locked due to OTP verification failed!\nPLease go back to login page' });
             }
             else {
                 let hash_password = data.password;
@@ -107,7 +107,6 @@ app.post('/auth', function (req, res) {
 
                 });
             }
-
         }
         else res.render('error.ejs');
     });
@@ -136,10 +135,10 @@ app.route('/otp_auth')
                     if (err) console.log(`Error in finding OTP in database: ${err}`);
                     if (data === null || data === 'undefined') { // No OTP Found
                         console.log("OPT not found");
-                        sess.invalid_count++;
-                        if (sess.invalid_count == 4) {
+                        sess.invalid_count++; // Increase +1 each time wrong OTP
+                        if (sess.invalid_count == 4) { // Max try == 4
                             userModel.findOne({ email: sess.email }, function (err, doc) {
-                                doc.status = 1;
+                                doc.status = 1; // change status to 1
                                 doc.save();
                                 let temp = new invalidModel({ email: doc.email });
                                 temp.save((err) => {
@@ -159,14 +158,24 @@ app.route('/otp_auth')
                     } else { // OTP found
                         console.log("OTP is found");
                         let time_temp = Date.now();
-                        if (time_temp - data.date_created > 100000) {//Check time expiration
+                        
+                        if (time_temp - data.date_created > 60000) {//Check time expiration
+                            otpModel.findOneAndDelete({otp_code:token_otp},function(error,doc){
+                                if(err) console.log(`Delete otp failed with error:${err}`);
+                                else console.log('Delete expired OTP success!');
+                            })
                             res.render('otp.ejs', { message: 'OTP Expired', invalid_count: sess.invalid_count });
                         }
                         else {// Check if otp code is valid
                             const isValid = otplib.authenticator.check(token_otp, otp_secret);
                             console.log(`Result compare:${isValid}`);
                             if (isValid) { // IF OTP CORRECT
+                                otpModel.findOneAndDelete({otp_code:token_otp},function(error,doc){
+                                    if(err) console.log(`Delete otp failed with error:${err}`);
+                                    else console.log('Delete OTP success!');
+                                })
                                 console.log('OTP success');
+                                req.session.isValid=isValid;
                                 res.render('dashboard.ejs');
                             }
 
@@ -185,13 +194,13 @@ app.route('/otp_auth')
         else {
             res.render('session_check.ejs');
         }
-    })
+    });
 
 
 //If login ,OTP verified success -->go to dashboard
 app.get('/dashboard', function (req, res) {
     let sess = req.session;
-    if (sess.email) {
+    if (sess.email && sess.isValid) {
         res.render('dashboard.ejs');
     }
     else {
@@ -205,7 +214,7 @@ app.route('/signup')
         res.render('signup', { message: undefined });
     })
     .post(function (req, res) {
-        let { email, password, name, age } = req.body;
+        let { email, password, name, age,phone } = req.body;
         console.log(`Email:${email}\nPassword:${password}\nName:${name}\nAge:${age}`);
         //Generate bcrypt password
         bcrypt.hash(password, saltRounds, function (err, hash) {
@@ -214,7 +223,7 @@ app.route('/signup')
                 res.render('signup.ejs', { message: err });
             }
             else { //Save user into database
-                let new_user = new userModel({ email: email, password: hash, name: name, age: age });
+                let new_user = new userModel({ email: email, password: hash, name: name, age: age,phone:phone });
                 new_user.save((err) => {
                     if (err) {
                         console.log(err);

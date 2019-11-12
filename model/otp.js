@@ -1,20 +1,24 @@
 const mongoose = require('mongoose');
 const uniqueValidator = require('mongoose-unique-validator');
 var OtpSchema = mongoose.Schema({
-    otp_code:{
-        type:String,
-        maxlength:7,
-        required:true,
-        unique:true
+    otp_code: {
+        type: String,
+        maxlength: 7,
+        required: true,
+        unique: true,
     },
-    date_created:{
-        type:Date,
-        required:true,
-        default:Date.now()
-    }
+    date_created: {
+        type: Date,
+        required: true,
+        default: Date.now(),
+    },
+    expireAt: {
+        type: Date,
+        default: Date.now
+    },
 })
 OtpSchema.plugin(uniqueValidator);
-
+OtpSchema.index({expireAt:1},{expireAfterSeconds:10});
 var otpModel = mongoose.model('otp_list', OtpSchema);
 
 exports.otpModel = otpModel;

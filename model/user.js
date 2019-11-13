@@ -51,6 +51,11 @@ var UserSchema = mongoose.Schema({
         type:Number,
         default:0,
         max:1
+    },
+    secret:{
+        type:String,
+        required:true,
+        maxlength:64
     }
 })
 UserSchema.plugin(uniqueValidator);

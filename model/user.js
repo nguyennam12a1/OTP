@@ -13,12 +13,8 @@ var invalidSchema=mongoose.Schema({
         type:Number,
         default:1,
         max:1
-    },
-    time:{
-        type:Date,
-        default:Date.now,
-        required:true
     }
+
 });
 
 var UserSchema = mongoose.Schema({
@@ -48,7 +44,7 @@ var UserSchema = mongoose.Schema({
     },
     phone:{
         type:Number,
-        max:10,
+        maxlength:10,
         required:true
     },
     status:{

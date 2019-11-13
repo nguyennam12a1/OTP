@@ -4,19 +4,30 @@ const express = require('express');
 const app = express();
 const session = require('express-session');
 const bcrypt = require('bcrypt');
-const Nexmo = require('nexmo');
 const otplib = require('otplib');
 const otp_secret = 'khanh9517';
-const nexmo = new Nexmo({
-    apiKey: '8f69d5f9',
-    apiSecret: 'hPdA2OlKBHIFuhfI', // Hiện tài khoản đã hết hạn sử dụng
-});
-
+const { generateSecret,
+    getQRCodeSVG,
+    getQRCodeURI } = require('@authentication/google-authenticator');
 let userSchema = require('./model/user');
 let otp_schema = require('./model/otp');
 let userModel = userSchema.userModel;
-let invalidModel = userModel.invalidModel;
+let invalidModel = userSchema.invalidModel;
 let otpModel = otp_schema.otpModel;
+
+
+
+//Prevent back button from Browser
+app.use(function (req, res, next) {
+    res.set('Cache-Control', 'no-cache, private, no-store, must-revalidate, max-stale=0, post-check=0, pre-check=0');
+    next();
+});
+
+//Setting otplib
+otplib.authenticator.options = {
+    step: 10, //expire after 10
+    window: 1
+};
 
 //Bcrypt setup
 const saltRounds = 10;
@@ -42,7 +53,6 @@ mongoose.connection.once('open', function (err) {
 //Routing
 app.get('/', function (req, res) {
     res.render('index.ejs', { message: undefined });
-    res.cookie.
 });
 
 
@@ -50,7 +60,6 @@ app.get('/', function (req, res) {
 app.get('/auth', function (req, res) {
     res.render('lmao.ejs');
 });
-
 app.post('/auth', function (req, res) {
     let { email, password } = req.body;
     console.log(`Email:${email}\nPassword:${password}`);
@@ -69,33 +78,27 @@ app.post('/auth', function (req, res) {
                 bcrypt.compare(password, hash_password, function (err, result) {
                     console.log(result);
                     if (result) {
-
                         console.log('User found');
                         //Session setup
                         let sess = req.session;
                         sess.email = email;
                         sess.password = password;
                         sess.invalid_count = 0;
-                        let receive_number = 84912432665; //Change this to client number,
-                        //Generate Token OTP
-                        const otp_code = otplib.authenticator.generate(otp_secret);
-                        let new_otp_code = new otpModel({ otp_code: otp_code });
-                        new_otp_code.save((err) => {
-                            if (err) console.log(`Error in saving new otp code:${otp_code}`);
-                        });
 
-                        console.log(`OTP Code is :${otp_code}`);
-                        //Send to client using SMS Nexmo
-                        nexmo.message.sendSms('Nexmo', receive_number, otp_code, { type: 'unicode' }, (err, data) => {
-                            if (err) {
-                                console.log(err);
-                                res.render('index.ejs', { message: 'Nexmo server error!', invalid_count: sess.invalid_count });
-                            }
-                            else {
-                                console.dir(data);
-                                res.render('otp.ejs', { message: 'Please enter your OTP code from sms', invalid_count: sess.invalid_count });
-                            }
-                        })
+                        //Generate Token OTP
+                        const otp_promise = new Promise(function (resolve, reject) {
+                            let temp = otplib.authenticator.generate(otp_secret);
+                            resolve(temp);
+                        });
+                        otp_promise.then(value => {
+                            let new_otp_code = new otpModel({ otp_code: value });
+                            new_otp_code.save((err) => {
+                                if (err) console.log(`Error in saving new otp code:${new_otp_code}`);
+                            });
+
+                            console.log(`OTP Code is :${new_otp_code.otp_code}`);
+                            res.render('otp.ejs', { message: 'Please enter your OTP code ', invalid_count: sess.invalid_count });
+                        });
                     }
                     else {
                         console.log('Sai thong tin đăng nhập');
@@ -132,6 +135,7 @@ app.route('/otp_auth')
                     if (err) console.log(`Error in finding OTP in database: ${err}`);
                     if (data === null || data === 'undefined') { // No OTP Found
                         console.log("OPT not found");
+
                         sess.invalid_count++; // Increase +1 each time wrong OTP
                         if (sess.invalid_count == 4) { // Max try == 4
                             userModel.findOne({ email: sess.email }, function (err, doc) {
@@ -144,6 +148,7 @@ app.route('/otp_auth')
                             });
                             console.log(`Invalid count locked: ${sess.invalid_count}`);
                             console.log('OTP verification failed');
+                            req.session.destroy();
                             res.render('otp.ejs', { message: 'You have been locked!', invalid_count: sess.invalid_count });
                         }
                         else {
@@ -157,8 +162,9 @@ app.route('/otp_auth')
                         // Check if otp code is valid
                         const isValid = otplib.authenticator.check(token_otp, otp_secret);
                         console.log(`Result compare:${isValid}`);
+                        let time_distance = Date.now() - data.date_created;
                         if (isValid) { // IF OTP CORRECT
-                            otpModel.findOneAndDelete({ otp_code: token_otp }, function (error, doc) {
+                            otpModel.findOneAndDelete({ otp_code: token_otp }, function (err, doc) {
                                 if (err) console.log(`Delete otp failed with error:${err}`);
                                 else console.log('Delete OTP success!');
                             })
@@ -166,7 +172,11 @@ app.route('/otp_auth')
                             req.session.isValid = isValid;
                             res.render('dashboard.ejs');
                         }
-                        else { // OTP Wrong
+                        else { // OTP expires
+                            otpModel.findOneAndDelete({ otp_code: token_otp }, function (err, doc) {
+                                if (err) console.log(`Delete expired otp failed with error:${err}`);
+                                else if (doc) console.log('Delete expired OTP success!');
+                            })
                             res.render('otp.ejs', { message: 'OTP has expired', invalid_count: sess.invalid_count });
                         }
                     }
